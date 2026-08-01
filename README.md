@@ -1,10 +1,12 @@
 # Zenyeno AI Ecommerce Product Analysis Engine
 
 [![CI](https://github.com/zenyenochen-alt/zenyeno-ai-core/actions/workflows/ci.yml/badge.svg)](https://github.com/zenyenochen-alt/zenyeno-ai-core/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 
-AI-agent-style product research, potential scoring, pricing optimization, sales recommendations, and report generation for cross-border ecommerce.
+Publicly available source code for AI-agent-style product research, potential scoring, pricing optimization, sales recommendations, and report generation for cross-border ecommerce.
+
+> **Noncommercial license:** You may inspect, study, modify, and share the software for permitted noncommercial purposes. Commercial use requires a separate written license from Zenyeno. See [License](#license) and the [Data Use Policy](DATA_USE_POLICY.md).
 
 > **Project status:** v0.1 is a transparent, deterministic baseline. It does not yet call an LLM or live marketplace API. The OpenAI dependency and environment variable are reserved for the next development phase.
 
@@ -148,8 +150,15 @@ The API is available at <http://localhost:8000>. Stop it with `docker compose do
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep module boundaries typed, add tests for behavioral changes, and never commit API keys or `.env` files.
+Issues and pull requests are welcome for noncommercial development. Contributions are distributed under the same PolyForm Noncommercial terms. Keep module boundaries typed, add tests for behavioral changes, and never commit API keys, production data, or `.env` files. Follow the [Security Policy](SECURITY.md) when reporting sensitive issues.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+The current version is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE):
+
+- personal study, research, experiments, testing, and other permitted noncommercial uses are allowed;
+- commercial operation, paid services, resale, revenue-generating use, or use with an anticipated commercial application requires a separate written commercial license from Zenyeno;
+- access to the source code grants no permission to access, collect, extract, sell, or redistribute third-party or private data;
+- authorized data use must comply with the [Data Use Policy](DATA_USE_POLICY.md).
+
+Historical versions previously released under MIT remain subject to the rights already granted for those versions. See [License History](LICENSE_HISTORY.md).

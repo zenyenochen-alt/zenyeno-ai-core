@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 __pycache__/
@@ -14,3 +16,20 @@ build/
 .idea/
 .vscode/
 .DS_Store
+
+# Credentials and private keys
+*.pem
+*.key
+credentials*.json
+service-account*.json
+
+# Local, exported, and production data
+data/
+exports/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.xlsx
+*.parquet
