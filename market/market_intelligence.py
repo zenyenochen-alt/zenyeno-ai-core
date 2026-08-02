@@ -20,7 +20,15 @@ class MarketIntelligence:
         score = max(0, min(100, score))
 
         demand = "High" if score >= 80 else "Medium" if score >= 55 else "Low"
-        competition = "High" if score >= 90 else "Medium" if score >= 60 else "Low"
+        high_competition_terms = ("beauty", "fashion", "electronics", "phone", "makeup")
+        low_competition_terms = ("industrial", "replacement part", "specialty", "niche")
+        competition = (
+            "High"
+            if any(word in text for word in high_competition_terms)
+            else "Low"
+            if any(word in text for word in low_competition_terms)
+            else "Medium"
+        )
         buyer_interest = "Strong" if score >= 80 else "Moderate" if score >= 55 else "Weak"
         recommendation = "GOOD" if score >= 75 else "TEST" if score >= 50 else "POOR"
 

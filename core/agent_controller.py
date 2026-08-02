@@ -6,15 +6,17 @@ from market.market_intelligence import MarketIntelligence
 from prediction.product_predictor import ProductPredictor
 from pricing.pricing_optimizer import PricingOptimizer
 from recommendation.recommend_engine import RecommendEngine
+from database.product_db import AnalysisRepository
 
 
 class AgentController:
-    def __init__(self) -> None:
+    def __init__(self, repository: AnalysisRepository | None = None) -> None:
         self.market_intelligence = MarketIntelligence()
         self.pricing_optimizer = PricingOptimizer()
         self.product_predictor = ProductPredictor()
         self.recommend_engine = RecommendEngine()
         self.report_generator = ReportGenerator()
+        self.repository = repository
 
     def analyze(self, product: ProductInput) -> ProductAnalysis:
         market = self.market_intelligence.analyze(product)
@@ -23,7 +25,7 @@ class AgentController:
         recommendations = self.recommend_engine.recommend(prediction, market, pricing)
         report = self.report_generator.generate(product, prediction, market, pricing, recommendations)
 
-        return ProductAnalysis(
+        result = ProductAnalysis(
             product=product.name,
             category=product.category,
             market=product.market,
@@ -35,3 +37,6 @@ class AgentController:
             sales_recommendations=recommendations,
             report=report,
         )
+        if self.repository is not None:
+            self.repository.save(product, result)
+        return result

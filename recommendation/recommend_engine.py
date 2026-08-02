@@ -11,9 +11,11 @@ class RecommendEngine:
         pricing: PricingAnalysis,
     ) -> SalesRecommendation:
         suggestions = [
-            f"Launch a small validation campaign at {pricing.recommended_price:.2f}.",
+            f"Launch a small validation campaign at {pricing.currency} {pricing.recommended_price:.2f}.",
             f"Track conversion and acquisition cost in {prediction.market}.",
         ]
+        if pricing.margin_percent < pricing.target_margin_percent:
+            suggestions.append("Reduce landed cost or raise the selling price before launch.")
         if market.competition != "Low":
             suggestions.append("Differentiate the offer with a clear use-case and short-form video creative.")
         if prediction.recommendation == "YES":
