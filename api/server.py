@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 
 from core.agent_controller import AgentController
+from core.automation_bridge import build_candidate_import, import_candidate
 from core.models import AnalysisHistory, AnalysisRecord, ProductAnalysis, ProductInput
 from database.product_db import AnalysisRepository
 
@@ -48,6 +49,8 @@ class SlidingWindowRateLimiter:
 def create_app(database_path: str | None = None) -> FastAPI:
     resolved_database_path = database_path or os.getenv("DATABASE_PATH", "data/analyses.db")
     configured_api_key = os.getenv("ZENYENO_API_KEY")
+    automation_api_url = os.getenv("AUTOMATION_API_URL", "").strip()
+    automation_api_key = os.getenv("AUTOMATION_API_KEY", "").strip()
     persistence_enabled = bool(configured_api_key) or os.getenv(
         "PERSIST_ANALYSES", "false"
     ).lower() in {"1", "true", "yes"}
@@ -155,6 +158,29 @@ def create_app(database_path: str | None = None) -> FastAPI:
     )
     def analyze(product: ProductInput) -> ProductAnalysis:
         return controller.analyze(product)
+
+    @application.post(
+        "/analyze/import",
+        tags=["analysis"],
+        dependencies=[Depends(authorize)],
+    )
+    def analyze_and_import(product: ProductInput) -> dict:
+        if not automation_api_url or not automation_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Automation bridge is not configured.",
+            )
+        analysis = controller.analyze(product)
+        payload = build_candidate_import(product, analysis)
+        try:
+            receipt = import_candidate(automation_api_url, automation_api_key, payload)
+        except (httpx.HTTPError, RuntimeError, ValueError) as error:
+            logger.exception("candidate_import_failed product=%s", product.name)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The analysis completed, but the private candidate import failed.",
+            ) from error
+        return {"analysis": analysis.model_dump(), "import_receipt": receipt}
 
     @application.get(
         "/analyses",

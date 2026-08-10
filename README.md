@@ -87,6 +87,8 @@ CORS_ORIGINS=https://your-frontend.example
 DATABASE_PATH=data/analyses.db
 PERSIST_ANALYSES=false
 OPENAI_API_KEY=
+AUTOMATION_API_URL=https://your-private-worker.example
+AUTOMATION_API_KEY=
 ```
 
 - If `ZENYENO_API_KEY` is empty, `/analyze` remains available for public demos.
@@ -94,8 +96,14 @@ OPENAI_API_KEY=
 - Public demo inputs are not persisted by default. Configure an API key or explicitly set `PERSIST_ANALYSES=true` to save analyses.
 - The rate limiter is a single-process baseline. A multi-instance deployment should use a shared store such as Redis.
 - `OPENAI_API_KEY` is reserved for the planned provider integration and is not used by v1.1.
+- `AUTOMATION_API_URL` and `AUTOMATION_API_KEY` enable the optional server-to-server candidate import. The private key is never sent to the browser.
 
 ## API usage
+
+Available analysis routes:
+
+- `POST /analyze` analyzes a product only.
+- `POST /analyze/import` analyzes a product and imports the result into the configured private candidate queue.
 
 ### Analyze a product
 
