@@ -20,3 +20,4 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: pytest -q
       - run: python -m compileall -q api core database market prediction pricing recommendation
+      - run: docker build --tag zenyeno-ai-core:ci .
