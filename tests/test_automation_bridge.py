@@ -57,3 +57,21 @@ def test_analyze_import_calls_private_engine(monkeypatch) -> None:
     )
     assert response.status_code == 200
     assert response.json()["import_receipt"]["imported"] == 1
+
+
+def test_analyze_import_returns_bad_gateway_when_private_engine_fails(monkeypatch) -> None:
+    monkeypatch.setenv("AUTOMATION_API_URL", "https://private.example")
+    monkeypatch.setenv("AUTOMATION_API_KEY", "private-secret")
+
+    def failing_post(*args, **kwargs):
+        request = httpx.Request("POST", "https://private.example/api/internal/candidates/import")
+        raise httpx.ConnectError("offline", request=request)
+
+    monkeypatch.setattr("core.automation_bridge.httpx.post", failing_post)
+    client = TestClient(create_app(":memory:"))
+    response = client.post(
+        "/analyze/import",
+        json={"name": "Storage Box", "category": "Home", "cost": 5, "market": "PH"},
+    )
+    assert response.status_code == 502
+    assert "private candidate import failed" in response.json()["detail"]
