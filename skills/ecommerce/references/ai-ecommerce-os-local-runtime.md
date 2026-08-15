@@ -159,3 +159,35 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 6. Copy the validated Skill to `%USERPROFILE%\.codex\skills\ecommerce`.
 7. Inspect Git diff and status for secrets and unrelated files.
 8. Commit only relevant files, then push. Never claim GitHub synchronization unless push succeeds.
+
+## 2026-08-15 TikTok Shop 官方 API 只读链路验收
+
+### 已验证架构
+
+`n8n Webhook -> 本机 Product Worker 双层鉴权代理 -> Cloudflare Worker -> TikTok Shop 官方 API`
+
+- Cloudflare Worker：`https://tiktok-shop-connector.zenyenochen.workers.dev`
+- Cloudflare 部署版本：`f5f2918b-2bce-403e-a570-f2b329d70b15`
+- 本机状态：`GET http://127.0.0.1:8000/tiktok/api/cloud/status`
+- 本机店铺读取：`GET /tiktok/api/cloud/shops`（要求 `X-Local-Automation-Key`）
+- 本机商品读取：`POST /tiktok/api/cloud/products/search`，body 为 `{"region":"TH|PH","page_size":1..100}`
+- n8n 生产 Webhook：`POST http://127.0.0.1:5678/webhook/tiktok-shop-products`
+- n8n 工作流：`TikTokShopApiReadonly001`
+
+### 验收证据
+
+- Cloudflare `/health`：`status=ok`、`token_stored=true`、`shops_stored=true`。
+- 官方授权店铺读取成功：泰国与菲律宾各 1 家，店名均为 `Ozawas Fun Life Studio`。
+- 官方商品读取成功：TH 返回 1 条，PH 返回 1 条（测试 `page_size=5`）。
+- n8n 生产 Webhook 对 TH、PH 均返回 `ok=true`，来源为 `tiktok_shop_official_api_via_cloudflare`。
+- 使用只读密钥访问 `/api/internal/summary` 返回 HTTP 401。
+- 不带本地自动化密钥访问本机店铺代理返回 HTTP 401。
+- `mutation_routes_enabled=false`；没有发布、改价、库存、订单或广告写入。
+
+### 凭证与维护
+
+- Cloudflare `READONLY_API_KEY` 是独立 Secret，旧 `INTERNAL_API_KEY` 未替换。
+- 云端只读密钥与 n8n 本地密钥经当前 Windows 用户 DPAPI 加密保存于 `runtimes/secrets/tiktok-shop-cloud-proxy.dpapi`。
+- n8n 本地密钥保存于 n8n Credentials，不写入工作流 JSON、Skill、Obsidian 或 Git。
+- Partner Center 的实际 OAuth 回调属于 Cloudflare Worker；本地旧 OAuth 状态不再作为当前连接判据。
+- 当前“已连接”只指授权店铺和商品的官方只读接口。写入操作仍必须单独实现、测试并人工确认。

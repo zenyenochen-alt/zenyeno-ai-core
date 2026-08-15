@@ -23,3 +23,7 @@ For the local AI Ecommerce OS official TikTok Shop integration:
 5. Seller Product API is for the authorized seller catalog, not unrestricted public competitor research.
 6. Keep `mutation_routes_enabled=false` until each write route has idempotency, reconciliation, and an explicit human approval gate.
 7. Never claim the API is connected until OAuth succeeds and a real read-only shop/product call returns `code=0`.
+
+## Verified Cloud Read-only Route
+
+For this installation, the production OAuth callback and tokens live in the allow-listed Cloudflare Worker. Treat the integration as connected only after both the authorized-shop call and a seller-product call succeed through the local authenticated proxy. Use `POST http://127.0.0.1:5678/webhook/tiktok-shop-products` with `region=TH` or `PH`. Never place the cloud or local read-only keys in workflow JSON, notes, Skills, logs, or Git. The local proxy must require `X-Local-Automation-Key`, and the cloud read-only key must remain unable to access `/api/internal/*`, orders, inventory, or other mutation surfaces.
