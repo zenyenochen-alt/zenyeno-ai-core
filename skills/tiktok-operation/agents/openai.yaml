@@ -1,0 +1,4 @@
+interface:
+  display_name: "TikTok Operations"
+  short_description: "Plan TikTok Shop operations"
+  default_prompt: "Use $tiktok-operation to plan this TikTok Shop task."

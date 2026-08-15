@@ -19,7 +19,8 @@
 - n8n: `http://127.0.0.1:5678`, container `ai-ecommerce-n8n`.
 - Worker: `http://127.0.0.1:8000`.
 - Ollama: `http://127.0.0.1:11434`, model `qwen3:4b`.
-- Workflow: `AI Ecommerce OS - 自动发现与商品分析`, ID `AiEcomDemo001`, version `1.1.0`.
+- Product analysis workflow: `AI Ecommerce OS - 自动发现与商品分析`, ID `AiEcomDemo001`, version `1.1.0`.
+- Worker version: `1.2.0`; official TikTok Shop API workflow: `TikTokShopApiReadonly001`.
 - Production webhook: `POST http://127.0.0.1:5678/webhook/ai-ecommerce-demo`.
 - Default live source: `https://www.doogusa.com/products/3-in-1-water-bottle-bowl`.
 
@@ -41,6 +42,36 @@ As of 2026-08-15, Browser Use reaches TikTok but receives `Security Check`; dire
 
 The verified public fallback is the DOOG product page. It is live marketplace data, not demo data. Costs, demand, competition, and compliance remain unknown unless separately collected.
 
+## Official TikTok Shop API
+
+Use the official API for long-term authorized shop operations. Browser collection is only a fallback and must not be used to evade region restrictions or Security Check.
+
+Local routes:
+
+- Setup UI: `http://127.0.0.1:8000/tiktok/api/setup`.
+- Status: `GET /tiktok/api/status`.
+- OAuth start/callback: `GET /tiktok/api/oauth/start` and `/tiktok/api/oauth/callback`.
+- Authorized shops: `GET /tiktok/api/shops`.
+- Read-only seller products: `POST /tiktok/api/products/search`.
+- n8n webhook: `POST http://127.0.0.1:5678/webhook/tiktok-shop-products`.
+
+Security and protocol:
+
+- Configure App Key, App Secret, Service ID, market, and Redirect URI only in the localhost setup page. Never request secrets in chat.
+- Config, OAuth state, access token, and refresh token are encrypted with Windows DPAPI under `runtimes\secrets`; never sync that directory.
+- OAuth uses Seller authorization, validates `state`, exchanges the one-time code, and refreshes access tokens before expiry.
+- Business API requests use official HMAC-SHA256 signing and `x-tts-access-token`.
+- Current routes are read-only and report `mutation_routes_enabled=false`.
+- Seller Product API reads the authorized seller's catalog. Do not describe it as arbitrary public competitor search.
+
+Acceptance:
+
+- Before configuration, `/tiktok/api/status` must return `configured=false`, `authorized=false`.
+- Before authorization, shop/product calls must fail explicitly; n8n must return structured `ok=false`, not an empty success.
+- After authorization, verify `code=0`, expected seller `user_type`, required scopes, authorized shop cipher, token expiry, and one read-only product search.
+- Keep publishing, repricing, inventory, campaigns, orders, and destructive actions disabled until separately implemented and explicitly approved.
+
+As of 2026-08-15, code and no-credential failure paths are verified, but Partner Center credentials are not configured. Do not claim the official API is authorized until the OAuth callback succeeds and a real shop/product response is recorded.
 ## Health checks
 
 ```powershell
