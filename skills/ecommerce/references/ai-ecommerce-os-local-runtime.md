@@ -191,3 +191,30 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - n8n 本地密钥保存于 n8n Credentials，不写入工作流 JSON、Skill、Obsidian 或 Git。
 - Partner Center 的实际 OAuth 回调属于 Cloudflare Worker；本地旧 OAuth 状态不再作为当前连接判据。
 - 当前“已连接”只指授权店铺和商品的官方只读接口。写入操作仍必须单独实现、测试并人工确认。
+
+## 2026-08-15 市场研究四链路验收
+
+### 结论
+
+- EchoTik：代理、鉴权、输入限制和 Cloudflare 部署均完成；真实数据调用被供应商以 `LINKFOX_INSUFFICIENT_CREDITS` 阻止，当前未取得数据。
+- FastMoss：代理、鉴权、跨境店过滤和 Cloudflare 部署均完成；真实数据调用被同一积分余额问题阻止，当前未取得数据。
+- LinkFox 公开搜索：路由完成，但同样受 LinkFox 积分余额阻止；现在返回结构化 HTTP 402，不再显示 Cloudflare 1101。
+- 独立公开网页搜索：成功发现 TikTok Shop TH/PH 的公开索引结果。搜索引擎结果属于公开快照，可能过期，不能当作实时审计销量。
+- Browser Use：运行正常。TikTok 菲律宾公开 PDP 被重定向到越南域名并显示 `Security Check`，已保存截图且未绕过；公开回退商品页成功提取 `3 in 1 Water Bottle/Bowl`、`17.99 USD`、5 条特征及截图。
+
+### 已部署接口
+
+- `POST /api/market-data/echotik`
+- `POST /api/market-data/fastmoss`
+- `POST /api/market-data/search`
+- Cloudflare Worker 版本：`609d08bf-f8ad-42c6-8a39-ac88f3972a59`
+- 三条接口只接受现有 `READONLY_API_KEY`，限制 TH/PH、关键词和最多 10 条，不提供写入能力。
+
+### 当前唯一人工阻塞
+
+需要给现有 LinkFox 账户充值积分。充值后只需重新各调用一次 EchoTik、FastMoss 和 LinkFox Search 验收，不需要重新部署代码或重新配置密钥。不要把“积分不足”解释成空结果。
+
+### 证据
+
+- `demo-evidence/market-data/2026-08-15/market-research-status.json`
+- `demo-evidence/browser-use-live-product-page.png`
