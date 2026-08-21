@@ -355,3 +355,58 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 服务器专用 TikTok 只读密钥尚未写入真实服务器；本次只验证了拒绝路径，未把本机秘密复制到云端。
 - 1688 官方实时 API、采购接口和异地备份目标仍需要外部账号/凭证或存储位置。
 - TikTok 上架、改价、库存、订单、1688 下单和付款仍全部关闭。后续即使取得写权限，也必须经过第二人工审批、幂等键、执行后回读和对账。
+
+## 2026-08-22 PostgreSQL 中央数据库完成
+
+本节覆盖前文“云端仍使用 SQLite / PostgreSQL 未执行”的旧状态。现在的准确状态是：本机单人模式继续使用 SQLite；`deploy/cloud` 中央服务器模式默认使用 PostgreSQL。
+
+### 实现
+
+- 新增 `services/product-worker/workbench_db.py`：保留 SQLite 行为，同时支持 `DATABASE_URL=postgresql://...`。
+- PostgreSQL 兼容层处理参数占位符、`INSERT OR IGNORE`、自增主键、返回 ID、行的名称/序号访问、事务提交/回滚、唯一约束异常和表字段检查。
+- 云端镜像固定 `psycopg[binary]==3.3.4`；该版本于 2026-08-22 从官方 PyPI 版本页核对并在镜像中安装成功。
+- `compose.yaml` 新增内部 `postgres:17.10-alpine3.23` 服务、健康检查、`postgres_data` 持久卷；镜像实际拉取摘要为 `sha256:8189a1f6e40904781fc9e2612687877791d21679866db58b1de996b31fc312e4`。
+- PostgreSQL 仅加入 Docker `automation` 网络并只 `expose 5432`，没有发布主机端口。
+- `.env.example`、`initialize-env.ps1`、`validate-deployment.ps1` 已加入 `POSTGRES_DB`、`POSTGRES_USER` 和随机十六进制 `POSTGRES_PASSWORD`；密码过短或格式错误会阻止部署。
+- 工作台 `/os/status` 会明确返回 `database=postgresql` 或 `database=sqlite`。
+- PostgreSQL 模式下，老板页面的 SQLite 备份按钮返回 HTTP 409 并指向服务器备份任务，避免制造一份错误的 SQLite 备份。
+
+### PostgreSQL 真实业务 E2E
+
+使用独立项目 `ai-ecommerce-postgres-smoke` 从空卷启动，PostgreSQL、connector、n8n、workbench 全部 healthy；数据库自动建立 12 张 public 表。随后通过真实 HTTP 接口完成：
+
+1. 首次老板账号初始化；
+2. 两个店铺种子数据；
+3. 创建员工并只授权一家店；
+4. 创建候选商品；
+5. 绑定 1688 供应商、OFFER、精确 SKU 和属性快照；
+6. 提交人工审批；
+7. 生成 `tiktok_listing_draft` 待执行项；
+8. 创建 `supplier_purchase` 待执行项；
+9. 重复采购请求返回同一个 outbox ID，幂等通过；
+10. 员工访问未授权店铺返回 HTTP 403；
+11. 全程 `marketplace_write_executed=false`、`payment_executed=false`。
+
+### 备份与恢复验收
+
+- `postgres-backup.sh` 使用 `pg_dump --format=custom`，随后执行 `pg_restore --list` 和 SHA-256。
+- 最新测试备份生成成功并恢复到临时数据库 `ai_ecommerce_restore_verify`。
+- SHA-256 核对为 `ok`，恢复为 `ok`；恢复库回读 `users=2`、`candidates=1`、`operation_outbox=2`。
+- 核验后临时恢复数据库、测试容器、测试账号、PostgreSQL 卷和测试备份卷全部删除。
+- 结构化证据：`demo-evidence/cloud-deployment/2026-08-22/postgres-smoke-result.json`。
+
+### 最终回归
+
+- 本地 SQLite 与云端配置共 9 项 unittest 全部通过。
+- 最终镜像重新构建成功；`.dockerignore` 后构建上下文为 474 bytes，测试脚本、`.env`、数据库、备份、浏览器资料和日志未进入生产镜像。
+- 本机工作台已重启加载最新代码；`/os/status` 返回 `database=sqlite`、`mutation_routes_enabled=false`，n8n 和 Ollama 仍为 HTTP 200。
+
+### 真实上线仍需要的外部输入
+
+- 一台真实 Linux 云服务器；
+- 一个公司主域名/子域名及 DNS 修改权限；
+- 服务器专用 TikTok 只读 API Key；
+- 一个异地备份目标；
+- 1688 官方 API 应用与凭证。
+
+这些外部输入到位前，不能声称员工已能从公网登录。TikTok/1688 写入、下单和付款仍全部关闭。
