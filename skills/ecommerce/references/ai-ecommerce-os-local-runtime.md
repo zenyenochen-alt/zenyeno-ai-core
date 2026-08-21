@@ -397,7 +397,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 
 ### 最终回归
 
-- 本地 SQLite 与云端配置共 10 项 unittest 全部通过。
+- 本地 SQLite 与云端配置共 11 项 unittest 全部通过。
 - 最终镜像重新构建成功；`.dockerignore` 后构建上下文为 474 bytes，测试脚本、`.env`、数据库、备份、浏览器资料和日志未进入生产镜像。
 - 本机工作台已重启加载最新代码；`/os/status` 返回 `database=sqlite`、`mutation_routes_enabled=false`，n8n 和 Ollama 仍为 HTTP 200。
 
@@ -419,7 +419,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - `backup.sh`：运行 PostgreSQL custom-format 备份。
 - `verify-latest-backup.sh`：核对最新备份 SHA-256 和 `pg_restore --list` 目录。
 - 六个 shell 脚本均在 `postgres:17.10-alpine3.23` 的 `/bin/sh` 中通过语法检查；临时初始化测试确认 `.env=600`、三项随机密钥长度均为64、占位域名守卫生效。
-- 加入 Linux 脚本检查后，本地自动测试为 10 项全部通过。
+- 加入 Linux 脚本检查后，本地自动测试为 11 项全部通过。
 - 结构化证据：`demo-evidence/cloud-deployment/2026-08-22/linux-deployment-scripts-result.json`。
 
 Linux 服务器执行顺序：
@@ -452,7 +452,7 @@ sh ./verify-latest-backup.sh
 
 ### 当前验收结果
 
-- 本地 SQLite 与云端配置共 10 项 unittest 全部通过。
+- 本地 SQLite 与云端配置共 11 项 unittest 全部通过。
 - 隔离 Docker 栈中 PostgreSQL、connector、n8n、workbench 全部 healthy。
 - PostgreSQL 当前创建 13 张 public 表，新增证据表自增 ID 在 PostgreSQL 兼容层中正确返回。
 - 证据齐全的测试候选得到 100 分并进入人工审核；证据不足候选无法提交。
@@ -461,3 +461,36 @@ sh ./verify-latest-backup.sh
 - PostgreSQL custom-format 备份恢复成功；恢复库回读 `tables=13`、`candidate_observations=1`、`operation_outbox=2`。
 - 临时恢复数据库、容器、网络、账号、测试数据库卷和备份卷全部删除。
 - 结构化证据：`demo-evidence/selection-radar/2026-08-22/evidenced-selection-postgres-smoke.json`。
+## 2026-08-22 Browser Use 接入员工工作台
+
+### 实现
+
+- 工作台候选商品新增“Browser Use自动采集”按钮，调用服务器配置的固定 `PRODUCT_COLLECTOR_URL`，员工不能把请求改向任意内网地址。
+- 新增 `POST /os/api/candidates/{candidate_id}/collect-browser-facts`：先校验员工店铺权限，再调用采集器，并要求返回 `collector=browser-use`。
+- 采集结果必须与候选商品同源；普通网页跳转到不同站点会被拒绝，TikTok Shop 官方域名之间的商品发现跳转例外。
+- `candidate_observations.evidence_json` 保存截图路径、实际观察字段、采集器假设和发现过程；元数据超过 25KB 会被拒绝。
+- 实时公开商品页只接受页面真正观察到的售价、币种、已售数量和卖点。不会把页面没有提供的到岸成本、月搜索量、竞品数量或合规结论写成事实。
+- 只有受控本地演示页明确标记 `cost_data_complete=true`、`market_data_complete=true` 时，才允许导入到岸成本、需求与竞争数据。
+- 本机模式默认启用采集器；`/os/status` 和 `/os/api/bootstrap` 明确返回 `browser_collector_enabled`。
+- 中央云端 `compose.yaml` 明确设置 `PRODUCT_COLLECTOR_ENABLED=false`，员工页面隐藏按钮。原因是生产工作台镜像不携带Chrome、TikTok Cookie、紫鸟资料或浏览器Profile；评分、手工证据、审批和队列功能不受影响。
+
+### 真实联调
+
+在隔离临时数据库和临时老板账号中，工作台真实调用本机 Browser Use 打开 `http://127.0.0.1:8000/demo-product`：
+
+- 保存截图及证据元数据；
+- 保存售价、到岸成本、需求、竞争、卖点、合规和币种共 7 类字段；
+- 严格评分为 87，结论为 `ready_for_human_review`；
+- `observation_id` 正常生成；
+- 未执行平台写入或付款；
+- 测试结束后临时账号、数据库和服务进程全部删除。
+
+随后重新构建隔离云端 PostgreSQL 栈，工作台、n8n、connector、PostgreSQL 全部 healthy；13 张表和 `evidence_json` 列完成备份恢复，恢复库回读 `candidate_observations=1`。临时云端数据库、容器、网络和数据卷全部删除。
+
+- 当前回归测试：11 项全部通过，工作台 JavaScript 语法检查通过。
+- 真实联调证据：`demo-evidence/selection-radar/2026-08-22/browser-use-workbench-integration.json`。
+- 云端回归证据：`demo-evidence/selection-radar/2026-08-22/browser-use-cloud-regression.json`。
+
+### 尚未执行
+
+云端专用 Browser Use 采集机尚未部署。不能直接把本机浏览器Profile或店铺Cookie上传到中央服务器。后续需要独立采集机、设备级访问控制、请求签名、允许域名清单和结果回传校验后，才能把云端开关打开。
