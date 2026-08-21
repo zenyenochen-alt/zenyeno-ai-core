@@ -397,7 +397,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 
 ### 最终回归
 
-- 本地 SQLite 与云端配置共 11 项 unittest 全部通过。
+- 本地 SQLite、采集机安全与云端配置共 15 项 unittest 全部通过。
 - 最终镜像重新构建成功；`.dockerignore` 后构建上下文为 474 bytes，测试脚本、`.env`、数据库、备份、浏览器资料和日志未进入生产镜像。
 - 本机工作台已重启加载最新代码；`/os/status` 返回 `database=sqlite`、`mutation_routes_enabled=false`，n8n 和 Ollama 仍为 HTTP 200。
 
@@ -419,7 +419,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - `backup.sh`：运行 PostgreSQL custom-format 备份。
 - `verify-latest-backup.sh`：核对最新备份 SHA-256 和 `pg_restore --list` 目录。
 - 六个 shell 脚本均在 `postgres:17.10-alpine3.23` 的 `/bin/sh` 中通过语法检查；临时初始化测试确认 `.env=600`、三项随机密钥长度均为64、占位域名守卫生效。
-- 加入 Linux 脚本检查后，本地自动测试为 11 项全部通过。
+- 加入 Linux 脚本检查后，本地自动测试为 15 项全部通过。
 - 结构化证据：`demo-evidence/cloud-deployment/2026-08-22/linux-deployment-scripts-result.json`。
 
 Linux 服务器执行顺序：
@@ -452,7 +452,7 @@ sh ./verify-latest-backup.sh
 
 ### 当前验收结果
 
-- 本地 SQLite 与云端配置共 11 项 unittest 全部通过。
+- 本地 SQLite、采集机安全与云端配置共 15 项 unittest 全部通过。
 - 隔离 Docker 栈中 PostgreSQL、connector、n8n、workbench 全部 healthy。
 - PostgreSQL 当前创建 13 张 public 表，新增证据表自增 ID 在 PostgreSQL 兼容层中正确返回。
 - 证据齐全的测试候选得到 100 分并进入人工审核；证据不足候选无法提交。
@@ -487,10 +487,65 @@ sh ./verify-latest-backup.sh
 
 随后重新构建隔离云端 PostgreSQL 栈，工作台、n8n、connector、PostgreSQL 全部 healthy；13 张表和 `evidence_json` 列完成备份恢复，恢复库回读 `candidate_observations=1`。临时云端数据库、容器、网络和数据卷全部删除。
 
-- 当前回归测试：11 项全部通过，工作台 JavaScript 语法检查通过。
+- 当前回归测试：15 项全部通过，工作台 JavaScript 语法检查通过。
 - 真实联调证据：`demo-evidence/selection-radar/2026-08-22/browser-use-workbench-integration.json`。
 - 云端回归证据：`demo-evidence/selection-radar/2026-08-22/browser-use-cloud-regression.json`。
 
 ### 尚未执行
 
 云端专用 Browser Use 采集机尚未部署。不能直接把本机浏览器Profile或店铺Cookie上传到中央服务器。后续需要独立采集机、设备级访问控制、请求签名、允许域名清单和结果回传校验后，才能把云端开关打开。
+## 2026-08-22 安全 Browser Use 采集机
+
+### 架构
+
+为避免把紫鸟环境、TikTok Cookie 或 Chrome Profile 上传中央服务器，新增独立 `browser_collector_agent.py`。正式链路设计为：
+
+```text
+中央工作台
+  -> HMAC-SHA256签名任务
+  -> HTTPS或私有VPN
+  -> 老板/采集电脑的Browser Use Agent
+  -> 本机浏览器采集与截图
+  -> HMAC-SHA256签名结果
+  -> 中央工作台验签后保存证据
+```
+
+### 安全门槛
+
+- 请求和响应均采用 HMAC-SHA256；共享密钥至少 32 字节，初始化脚本生成 64 位十六进制随机值。
+- 签名覆盖协议版本、消息类型、Unix时间、随机 nonce 和规范化 JSON 的 SHA-256。
+- 请求时间允许偏差 90 秒；过期或未来请求返回 HTTP 401。
+- nonce 在采集机内存中保存 180 秒；重复请求返回 HTTP 409，阻止重放。
+- 中央工作台对非本机采集地址强制 `https://`；缺少强密钥返回 HTTP 503。
+- 中央工作台同时验证响应时间、nonce 和响应签名；篡改结果返回 HTTP 502，不写入证据库。
+- 采集机启动脚本只监听 `127.0.0.1:8012`，不能直接把8012端口暴露公网；必须通过HTTPS反向隧道或私有VPN连接。
+- 健康接口明确返回 `writes_enabled=false`；采集机不包含上架、购买或付款接口。
+
+### 文件与启动
+
+- 协议实现：`services/product-worker/browser_collector_security.py`
+- 采集机服务：`services/product-worker/browser_collector_agent.py`
+- Windows启动：`services/product-worker/start-browser-collector-agent.cmd`
+
+采集电脑先在本机环境变量中设置 `BROWSER_COLLECTOR_SHARED_SECRET`，然后运行启动脚本。中央服务器 `.env` 使用相同密钥，并设置：
+
+```env
+PRODUCT_COLLECTOR_ENABLED=true
+PRODUCT_COLLECTOR_URL=https://真实采集机域名/v1/collect
+PRODUCT_COLLECTOR_SHARED_SECRET=64位十六进制随机密钥
+```
+
+随后必须重新运行 `validate-deployment.ps1` 或 `validate-deployment.sh`。占位域名、HTTP地址或弱密钥都会阻止开启。
+
+### 验收
+
+- 自动回归现为 15 项，覆盖缺少签名、签名篡改、过期请求、nonce重放、响应验签、云端默认关闭和PowerShell 5.1兼容。
+- 真实三段联调 `临时中央工作台 -> 签名采集机 -> Browser Use -> 签名回传` 成功；采集7类字段、评分87、保存截图和证据ID。
+- 一次性共享密钥没有写入证据文件，临时账号、数据库、8011/8012服务和目录均删除。
+- Windows PowerShell 5.1 和 Linux `/bin/sh` 初始化脚本均生成64位随机采集密钥；默认关闭验证通过，开启占位URL被阻止，真实HTTPS URL与强密钥验证通过。
+- 云端生产镜像重新构建成功，PostgreSQL业务冒烟通过，`browser_collector_enabled=false` 为默认状态。
+- 证据：`demo-evidence/selection-radar/2026-08-22/secure-browser-collector-deployment.json`。
+
+### 仍需外部条件
+
+代码与本机安全链路已经完成，但真实远程配对尚未执行，因为仍缺少公网员工服务器、公司域名和采集机HTTPS/VPN地址。取得这些资源后才能把云端 `PRODUCT_COLLECTOR_ENABLED` 改为 `true`。
