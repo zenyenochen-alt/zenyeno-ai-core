@@ -229,6 +229,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 初始店铺占位：`TH-01 泰国店01`、`PH-01 菲律宾店01`。占位名称必须在正式使用前与 TikTok Shop 官方店铺 ID 复核。
 - 员工可新增选品候选、绑定 1688 供应商与商品、提交审批；老板或管理员可批准、退回或拒绝。
 - 工作台新增商品列表、商品异常、AI分析、标题与卖点草稿；商品通过现有 n8n -> TikTok Shop 官方 API 只读链路同步，异常采用可解释规则，草稿只使用已观察事实。
+- 免费选品雷达已加入：利润、需求、竞争、差异化、合规共 100 分；任一关键数据未知时该项记 0 并保留 locking_unknowns，只有无阻断且总分至少 70 才进入人工复核，永不直接发布。
 - 操作日志记录登录、员工创建、候选创建、供应链绑定、提交和审批，不记录密码、Cookie 或 API Key。
 - 数据库：`data/workbench.db`（本地 SQLite 试运行）；会话签名密钥在 `runtimes/secrets/workbench-session.key`，不得提交 Git。
 
