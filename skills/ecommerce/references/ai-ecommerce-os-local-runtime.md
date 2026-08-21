@@ -218,3 +218,41 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 
 - `demo-evidence/market-data/2026-08-15/market-research-status.json`
 - `demo-evidence/browser-use-live-product-page.png`
+
+## 2026-08-21 员工工作台与供应链绑定试运行
+
+### 已部署
+
+- 本地入口：`http://127.0.0.1:8000/os`；首次进入跳转 `/os/setup` 创建老板账号。
+- 服务状态：`GET /os/status`；返回 `mutation_routes_enabled=false`。
+- 老板可创建员工，并将一个员工分配到多家店；员工只会读取服务端分配给自己的店铺。
+- 初始店铺占位：`TH-01 泰国店01`、`PH-01 菲律宾店01`。占位名称必须在正式使用前与 TikTok Shop 官方店铺 ID 复核。
+- 员工可新增选品候选、绑定 1688 供应商与商品、提交审批；老板或管理员可批准、退回或拒绝。
+- 操作日志记录登录、员工创建、候选创建、供应链绑定、提交和审批，不记录密码、Cookie 或 API Key。
+- 数据库：`data/workbench.db`（本地 SQLite 试运行）；会话签名密钥在 `runtimes/secrets/workbench-session.key`，不得提交 Git。
+
+### 1688 精确绑定硬门槛
+
+仅保存一个链接不够。每个候选必须绑定：供应商 ID、供应商名称、1688 OFFER ID、`detail.1688.com` 或 `m.1688.com` 链接、店铺 SKU -> 1688 SKU ID、SKU 属性快照、当前采购价、币种、库存、发货天数和采集时间。系统为整个快照生成 SHA-256；缺少任一必要数字或 SKU 映射时禁止提交审批。
+
+批准只表示“允许进入人工上架核验”，不会调用 TikTok Shop 上架、改价、库存、订单、1688 下单或付款接口。出单后采购仍需重新读取供应商价格、库存、SKU 属性和时效，并由人工确认。
+
+### 启停与验收
+
+- 启动：运行 `services/product-worker/start-worker.cmd`。
+- 停止：只停止监听 `127.0.0.1:8000` 且命令行为 `uvicorn app:app` 的对应进程。
+- 自动测试：在 `services/product-worker` 运行 `..\..\runtimes\browser-use\.venv\Scripts\python.exe -m unittest -v test_workbench.py`。
+- 2026-08-21 验收通过：老板初始化、员工分店权限、越权拦截、候选、错误 1688 域名拦截、数字校验、SKU 映射、未绑定禁止提交、审批、重复/越权审批拦截、日志回读。
+- 健康检查通过：Product Worker `status=ok`、Browser Use 可用、Ollama `qwen3:4b` 可用；工作台 `status=ok` 且平台写入关闭。
+
+### 仍未执行
+
+- 未把工作台部署到云服务器，也未配置公司域名、HTTPS、PostgreSQL、自动备份或远程员工访问。
+- 未将 TikTok 官方商品实时同步进工作台；现有 TikTok Shop 官方接口仍是独立只读链路。
+- 未接入 1688 官方实时 API；当前由员工录入并保存证据快照。
+- 未启用 TikTok 自动上架、1688 自动下单或付款。
+- LinkFox/EchoTik/FastMoss 真实数据仍受积分不足阻塞，不能把受阻当作无结果。
+
+### 老板下一步
+
+打开 `http://127.0.0.1:8000/os/setup`，自行创建第一个老板账号和强密码。不要把密码发给 Codex。进入后先创建一名测试员工并只分配一家测试店，再用一条真实 1688 商品做候选和 SKU 绑定演练。
