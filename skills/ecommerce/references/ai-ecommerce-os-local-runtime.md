@@ -228,6 +228,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 老板可创建员工，并将一个员工分配到多家店；员工只会读取服务端分配给自己的店铺。
 - 初始店铺占位：`TH-01 泰国店01`、`PH-01 菲律宾店01`。占位名称必须在正式使用前与 TikTok Shop 官方店铺 ID 复核。
 - 员工可新增选品候选、绑定 1688 供应商与商品、提交审批；老板或管理员可批准、退回或拒绝。
+- 工作台新增商品列表、商品异常、AI分析、标题与卖点草稿；商品通过现有 n8n -> TikTok Shop 官方 API 只读链路同步，异常采用可解释规则，草稿只使用已观察事实。
 - 操作日志记录登录、员工创建、候选创建、供应链绑定、提交和审批，不记录密码、Cookie 或 API Key。
 - 数据库：`data/workbench.db`（本地 SQLite 试运行）；会话签名密钥在 `runtimes/secrets/workbench-session.key`，不得提交 Git。
 
@@ -243,6 +244,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 停止：只停止监听 `127.0.0.1:8000` 且命令行为 `uvicorn app:app` 的对应进程。
 - 自动测试：在 `services/product-worker` 运行 `..\..\runtimes\browser-use\.venv\Scripts\python.exe -m unittest -v test_workbench.py`。
 - 2026-08-21 验收通过：老板初始化、员工分店权限、越权拦截、候选、错误 1688 域名拦截、数字校验、SKU 映射、未绑定禁止提交、审批、重复/越权审批拦截、日志回读。
+- 第二组自动测试通过：官方只读商品合同、商品缓存、不可售/缺SKU异常识别、事实草稿保存和 publish_allowed=false。
 - 健康检查通过：Product Worker `status=ok`、Browser Use 可用、Ollama `qwen3:4b` 可用；工作台 `status=ok` 且平台写入关闭。
 - Docker Desktop 恢复后，n8n /healthz 返回 HTTP 200；生产 Webhook 对 TH、PH 均返回 ok=true、mode=read_only、mutation_routes_enabled=false，本次 page_size=5 验收各回读 5 条商品。
 
