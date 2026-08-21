@@ -333,6 +333,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 本地与云端共 8 项 unittest 通过：多店权限、官方只读同步、异常、事实草稿、审批/待执行队列、备份恢复、首次设置令牌、云端网络/失败语义。
 - 隔离测试完成后，临时容器、临时数据库卷、临时账号和临时备份已全部删除。
 - 本机实际服务仍健康：工作台 `:8000`、n8n `:5678`、Ollama `:11434` 均返回 HTTP 200。
+- 结构化验收证据：`demo-evidence/cloud-deployment/2026-08-22/smoke-result.json`。
 
 ### 真实服务器部署步骤
 
