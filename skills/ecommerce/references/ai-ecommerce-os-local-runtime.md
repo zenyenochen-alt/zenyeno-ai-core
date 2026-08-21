@@ -229,7 +229,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 初始店铺占位：`TH-01 泰国店01`、`PH-01 菲律宾店01`。占位名称必须在正式使用前与 TikTok Shop 官方店铺 ID 复核。
 - 员工可新增选品候选、绑定 1688 供应商与商品、提交审批；老板或管理员可批准、退回或拒绝。
 - 工作台新增商品列表、商品异常、AI分析、标题与卖点草稿；商品通过现有 n8n -> TikTok Shop 官方 API 只读链路同步，异常采用可解释规则，草稿只使用已观察事实。
-- 免费选品雷达已加入：利润、需求、竞争、差异化、合规共 100 分；任一关键数据未知时该项记 0 并保留 locking_unknowns，只有无阻断且总分至少 70 才进入人工复核，永不直接发布。
+- 免费选品雷达已加入：利润、需求、竞争、差异化、合规共 100 分；任一关键数据未知时该项记 0 并保留 locking_unknowns，只有无阻断且总分至少 70 才进入人工复核，永不直接发布。
 - 操作日志记录登录、员工创建、候选创建、供应链绑定、提交和审批，不记录密码、Cookie 或 API Key。
 - 数据库：`data/workbench.db`（本地 SQLite 试运行）；会话签名密钥在 `runtimes/secrets/workbench-session.key`，不得提交 Git。
 
@@ -351,7 +351,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 ### 当前仍未执行
 
 - 尚未购买/指定真实云服务器和公司域名，因此没有公网 URL、真实 DNS 或正式 HTTPS 证书。
-- 云端试运行仍采用单实例 SQLite；多人正式长期使用前仍建议迁移 PostgreSQL。当前不能把它称为多实例高可用生产系统。
+- 云端中央服务器模式已经迁移到内部 PostgreSQL；真实公网部署、异地备份和多实例高可用仍未执行。
 - 服务器专用 TikTok 只读密钥尚未写入真实服务器；本次只验证了拒绝路径，未把本机秘密复制到云端。
 - 1688 官方实时 API、采购接口和异地备份目标仍需要外部账号/凭证或存储位置。
 - TikTok 上架、改价、库存、订单、1688 下单和付款仍全部关闭。后续即使取得写权限，也必须经过第二人工审批、幂等键、执行后回读和对账。
@@ -373,7 +373,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 
 ### PostgreSQL 真实业务 E2E
 
-使用独立项目 `ai-ecommerce-postgres-smoke` 从空卷启动，PostgreSQL、connector、n8n、workbench 全部 healthy；数据库自动建立 12 张 public 表。随后通过真实 HTTP 接口完成：
+使用独立项目 `ai-ecommerce-postgres-smoke` 从空卷启动，PostgreSQL、connector、n8n、workbench 全部 healthy；数据库自动建立 13 张 public 表。随后通过真实 HTTP 接口完成：
 
 1. 首次老板账号初始化；
 2. 两个店铺种子数据；
@@ -433,3 +433,31 @@ sh ./deploy.sh
 sh ./backup.sh
 sh ./verify-latest-backup.sh
 ```
+
+## 2026-08-22 证据化选品雷达与审核硬门槛
+
+本次把“系统选品 → 人工审核 → 1688 精确 SKU → 上架草稿队列”从可演示流程升级为有证据硬门槛的流程。平台写入、采购执行和付款仍关闭。
+
+### 新增实现
+
+- 新增 `candidate_observations` 追加式证据表；每条记录保存候选商品、来源名称、来源类型、公开 URL、观察事实、观察时间、采集人和创建时间。
+- 新增 `POST /os/api/candidates/{candidate_id}/observations`；支持 `public_page`、`browser_use`、`official_api`、`echotik`、`fastmoss`、`supplier_quote` 和 `manual_research` 来源。
+- 工作台“选品候选”增加“补充带证据数据”按钮，员工可录入售价、到岸成本、需求、竞争数量、可核实卖点、合规风险和币种；每个数值都会关联证据记录 ID、URL 与时间。
+- 公开选品证据超过 30 天会被拒绝；1688 价格、库存和发货时效快照超过 7 天会被拒绝；未来时间和无时区时间会被拒绝。
+- 严格评分仍为利润 25、需求 25、竞争 20、差异化 15、合规 15。字段有数值但没有证据时记 0，并列入 `blocking_unknowns`。
+- 只有无阻断且总分至少 70 的候选才标记 `ready_for_human_review`；否则提交上架审核返回 HTTP 422。
+- 已在等待审批或已经批准的候选不能直接改写选品证据或更换供应商绑定，避免审批后偷换商品。
+- 普通员工只能调研和提交；任务审批接口继续只允许老板或经理。
+- 供应链实质快照比较价格、库存、时效、供应商、OFFER 和精确 SKU；重新采集时间可以变化，但任何实质字段变化仍返回 HTTP 409 并阻止采购。
+
+### 当前验收结果
+
+- 本地 SQLite 与云端配置共 10 项 unittest 全部通过。
+- 隔离 Docker 栈中 PostgreSQL、connector、n8n、workbench 全部 healthy。
+- PostgreSQL 当前创建 13 张 public 表，新增证据表自增 ID 在 PostgreSQL 兼容层中正确返回。
+- 证据齐全的测试候选得到 100 分并进入人工审核；证据不足候选无法提交。
+- 审批后生成 `tiktok_listing_draft`，采购请求生成 `supplier_purchase`，重复采购返回相同 outbox ID。
+- 员工跨店访问返回 HTTP 403；全程 `marketplace_write_executed=false`、`payment_executed=false`。
+- PostgreSQL custom-format 备份恢复成功；恢复库回读 `tables=13`、`candidate_observations=1`、`operation_outbox=2`。
+- 临时恢复数据库、容器、网络、账号、测试数据库卷和备份卷全部删除。
+- 结构化证据：`demo-evidence/selection-radar/2026-08-22/evidenced-selection-postgres-smoke.json`。
