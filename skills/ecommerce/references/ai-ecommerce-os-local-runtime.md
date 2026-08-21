@@ -244,6 +244,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 自动测试：在 `services/product-worker` 运行 `..\..\runtimes\browser-use\.venv\Scripts\python.exe -m unittest -v test_workbench.py`。
 - 2026-08-21 验收通过：老板初始化、员工分店权限、越权拦截、候选、错误 1688 域名拦截、数字校验、SKU 映射、未绑定禁止提交、审批、重复/越权审批拦截、日志回读。
 - 健康检查通过：Product Worker `status=ok`、Browser Use 可用、Ollama `qwen3:4b` 可用；工作台 `status=ok` 且平台写入关闭。
+- Docker Desktop 恢复后，n8n /healthz 返回 HTTP 200；生产 Webhook 对 TH、PH 均返回 ok=true、mode=read_only、mutation_routes_enabled=false，本次 page_size=5 验收各回读 5 条商品。
 
 ### 仍未执行
 
