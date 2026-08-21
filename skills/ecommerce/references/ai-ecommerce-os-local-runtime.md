@@ -549,3 +549,42 @@ PRODUCT_COLLECTOR_SHARED_SECRET=64位十六进制随机密钥
 ### 仍需外部条件
 
 代码与本机安全链路已经完成，但真实远程配对尚未执行，因为仍缺少公网员工服务器、公司域名和采集机HTTPS/VPN地址。取得这些资源后才能把云端 `PRODUCT_COLLECTOR_ENABLED` 改为 `true`。
+
+## 2026-08-22 Restic 加密异地备份闭环
+
+本节覆盖前文“异地备份尚未实现”的旧状态。准确状态是：加密 S3 兼容备份、下载、隔离验证和真实 PostgreSQL 恢复代码已经完成；由于尚未提供真实对象存储端点和访问凭证，生产 `.env` 仍保持 `OFFSITE_BACKUP_ENABLED=false`，当前没有真实公网异地副本。
+
+### 实现
+
+- 固定使用官方 `restic/restic:0.19.1` 镜像；Restic 在上传前客户端加密。
+- `offsite-backup.ps1/.sh` 先创建并验证 PostgreSQL custom-format dump，再上传 dump 与校验文件。
+- PostgreSQL SHA-256 清单改为可移动的相对文件名；恢复验证同时兼容旧的绝对路径清单。
+- 生产仓库只允许 `s3:https://`；明文 HTTP 只能在显式隔离测试模式使用，而生产验证器强制禁止测试模式。
+- 真实启用必须提供强 `RESTIC_PASSWORD`、S3 access key、secret key 和非占位仓库地址。
+- `RESTIC_AUTO_INIT=true` 只用于第一次创建仓库，首个备份成功后恢复为 `false`。
+- 每次上传后运行 `restic check --read-data-subset`；生产默认抽查 5%，隔离测试读取 100%。
+- 恢复只进入独立 `offsite_restore` 卷；目标非空时拒绝恢复，不会覆盖在线 PostgreSQL。
+- 没有自动 `forget`/`prune`，避免未经审批删除远端快照。
+
+### 验收
+
+在没有公网端口的临时 Docker 网络中启动 PostgreSQL 与 S3 兼容对象存储：
+
+1. 创建带 1 条探针记录的数据库并生成 custom-format dump；
+2. 初始化临时加密仓库并上传；
+3. 验证对象名不含数据库 dump、`.dump` 或 `.sha256` 文件名；
+4. 使用错误口令访问，确认被拒绝；
+5. 从对象存储恢复到新的空卷；
+6. 验证 SHA-256 与 `pg_restore --list`；
+7. 将 dump 恢复到新的 PostgreSQL 数据库，回读探针记录为 1；
+8. 删除临时数据库、对象存储、容器、网络和卷。
+
+结果：16 项项目回归测试通过；全程 `live_database_overwritten=false`、`marketplace_writes_enabled=false`、`credentials_persisted=false`。结构化证据：`demo-evidence/cloud-deployment/2026-08-22/encrypted-offsite-backup-smoke.json`。
+
+### 真实上线仍需
+
+- 老板选择一个 S3 兼容对象存储并创建专用私有存储桶；
+- 创建只允许该存储桶路径的最小权限访问键；
+- 在服务器 `.env` 填写真实端点、区域和访问键；
+- 首次初始化后立即关闭 `RESTIC_AUTO_INIT`；
+- 设置每日备份计划，并至少每月执行一次隔离恢复演练。
