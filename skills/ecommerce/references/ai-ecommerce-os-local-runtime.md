@@ -295,3 +295,62 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 1688实时商品与采购API需要合法开放平台应用和凭证；当前二次核验由人工录入事实快照。
 - TikTok写入API需要单独申请写权限、沙箱验证、第二审批、结果回读与对账；当前只创建待执行项。
 - LinkFox/EchoTik/FastMoss真实市场数据仍受积分余额限制。免费公开搜索不能替代实时市场数据库。
+
+## 2026-08-22 中央服务器部署包与隔离联调
+
+### 已实现的部署包
+
+云端部署目录：`outputs/ai-ecommerce-os/deploy/cloud`。
+
+- `Dockerfile`：固定 Python 3.12.10，使用非 root 用户，包含工作台、备份程序、云端应用和内部只读连接器。
+- `compose.yaml`：工作台、内部 TikTok 只读连接器、n8n、Caddy、备份任务；Ollama 为可选 profile。
+- `Caddyfile`：自动 HTTPS、HTTP 跳转、HSTS、禁止 iframe、关闭摄像头/麦克风/定位权限，并隐藏 Server 响应头。
+- `workflows/tiktok-shop-readonly-cloud.json`：新实例首次启动时自动导入并发布；只允许 TH/PH 和 1–100 条，只调用 Docker 内网 `connector:8010`。
+- `.env.example` 与 `initialize-env.ps1`：生成首次设置令牌和 n8n 加密密钥；真实 `.env` 已被 `.gitignore` 和项目根 `.dockerignore` 排除。
+- `validate-deployment.ps1`：占位域名、短密钥、占位 TikTok 只读密钥或无效域名都会阻止部署。
+- `deploy.ps1`：验证后构建并启动。
+- `backup.ps1`：离线网络模式运行 SQLite 在线备份、SHA-256 和 `PRAGMA quick_check`。
+
+### 网络与密钥边界
+
+- 只有 Caddy 发布主机 `80/443`；工作台、n8n、内部连接器没有主机端口。
+- 工作台同时连接 `edge` 和 `automation`；n8n/connector 只在 `automation`；Caddy 只在 `edge`。
+- n8n 工作流没有 Credential、API Key 或外部 Worker 地址，也不能读取宿主环境变量。
+- `TIKTOK_READONLY_API_KEY` 只存在于 connector 容器环境；connector 的外部目标固定为允许名单中的 Cloudflare Worker。
+- n8n 明确禁止未验证社区包；平台写入仍为 `mutation_routes_enabled=false`。
+- `.dockerignore` 排除 `.env`、数据库、备份、日志、浏览器 profile、runtimes、sources 和 demo evidence，防止进入镜像构建上下文。
+
+### 2026-08-22 实际验收结果
+
+- Docker Compose 配置解析通过；Caddy `2.10.2-alpine` 配置验证为 `Valid configuration`。
+- 工作台/connector/backup 镜像重新构建成功，构建上下文约 2.27 KB，未携带本地资料。
+- 使用独立项目名 `ai-ecommerce-cloud-smoke` 从空卷启动：connector、n8n、workbench 均为 healthy。
+- n8n CLI 可列出并发布固定工作流 `TikTokShopCloudReadonly001`。
+- 错误输入 `{region: US, page_size: 0}` 返回 HTTP 400、`ok=false`、`status=invalid_input`。
+- 测试只读密钥被上游拒绝时返回 HTTP 502、`ok=false`、`status=upstream_error`，没有 HTTP 200 假成功。
+- 错误首次设置令牌返回 HTTP 403；正确临时令牌创建测试老板返回 HTTP 200，Cookie 同时包含 Secure、HttpOnly、SameSite=Lax。
+- 云端备份任务成功：98,304 bytes，SHA-256 已生成，`sqlite_quick_check=ok`。
+- 本地与云端共 8 项 unittest 通过：多店权限、官方只读同步、异常、事实草稿、审批/待执行队列、备份恢复、首次设置令牌、云端网络/失败语义。
+- 隔离测试完成后，临时容器、临时数据库卷、临时账号和临时备份已全部删除。
+- 本机实际服务仍健康：工作台 `:8000`、n8n `:5678`、Ollama `:11434` 均返回 HTTP 200。
+
+### 真实服务器部署步骤
+
+1. 准备一台 Linux 云服务器，开放入站 TCP 80/443，并安装 Docker Engine 与 Compose plugin。
+2. 把 `ai-ecommerce-os` 项目复制到服务器，但不要复制本机 `.env`、数据库、浏览器 profile、Cookie 或 DPAPI 文件。
+3. 进入 `deploy/cloud`，运行：`powershell -NoProfile -ExecutionPolicy Bypass -File ./initialize-env.ps1`。Linux 没有 PowerShell 时，按照 `.env.example` 手工创建 `.env`，首次设置令牌和 n8n 加密密钥至少 48 字符随机值。
+4. 设置 `OS_DOMAIN=os.<公司主域名>` 和服务器专用的 `TIKTOK_READONLY_API_KEY`。不要在聊天、Git、截图或员工电脑中传递密钥。
+5. 在域名服务商将该子域名 A/AAAA 记录指向服务器公网 IP。
+6. 运行 `validate-deployment.ps1`；验证通过后运行 `deploy.ps1`。Linux 等效命令：`docker compose --env-file .env -f compose.yaml config --quiet`，然后 `docker compose --env-file .env -f compose.yaml up -d --build`。
+7. 等待 DNS 生效和 Caddy 自动签发证书，打开 `https://os.<公司主域名>/os/setup`。
+8. 使用服务器 `.env` 中的首次设置令牌，自行创建老板账号和强密码；不要把老板密码交给 Codex。
+9. 创建测试员工，只授权一家测试店，先完成只读同步、候选、1688 SKU 绑定、审批和操作日志演练。
+10. 设置每天运行 `backup.ps1`，并把备份复制到另一台机器或对象存储；只保存在同一服务器不算异地备份。
+
+### 当前仍未执行
+
+- 尚未购买/指定真实云服务器和公司域名，因此没有公网 URL、真实 DNS 或正式 HTTPS 证书。
+- 云端试运行仍采用单实例 SQLite；多人正式长期使用前仍建议迁移 PostgreSQL。当前不能把它称为多实例高可用生产系统。
+- 服务器专用 TikTok 只读密钥尚未写入真实服务器；本次只验证了拒绝路径，未把本机秘密复制到云端。
+- 1688 官方实时 API、采购接口和异地备份目标仍需要外部账号/凭证或存储位置。
+- TikTok 上架、改价、库存、订单、1688 下单和付款仍全部关闭。后续即使取得写权限，也必须经过第二人工审批、幂等键、执行后回读和对账。
