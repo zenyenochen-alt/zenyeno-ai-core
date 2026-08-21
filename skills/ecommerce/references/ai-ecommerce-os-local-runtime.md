@@ -397,7 +397,7 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 
 ### 最终回归
 
-- 本地 SQLite 与云端配置共 9 项 unittest 全部通过。
+- 本地 SQLite 与云端配置共 10 项 unittest 全部通过。
 - 最终镜像重新构建成功；`.dockerignore` 后构建上下文为 474 bytes，测试脚本、`.env`、数据库、备份、浏览器资料和日志未进入生产镜像。
 - 本机工作台已重启加载最新代码；`/os/status` 返回 `database=sqlite`、`mutation_routes_enabled=false`，n8n 和 Ollama 仍为 HTTP 200。
 
@@ -410,3 +410,26 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 - 1688 官方 API 应用与凭证。
 
 这些外部输入到位前，不能声称员工已能从公网登录。TikTok/1688 写入、下单和付款仍全部关闭。
+
+### Linux 一键部署与备份脚本
+
+- `initialize-env.sh`：从 `/dev/urandom` 生成 64 位十六进制 PostgreSQL 密码、首次设置令牌和 n8n 加密密钥，并将 `.env` 权限设为 `600`。
+- `validate-deployment.sh`：验证真实域名、PostgreSQL变量、TikTok只读密钥、Docker和Compose配置；占位域名会直接阻止部署。
+- `deploy.sh`：先验证，再构建和启动中央服务。
+- `backup.sh`：运行 PostgreSQL custom-format 备份。
+- `verify-latest-backup.sh`：核对最新备份 SHA-256 和 `pg_restore --list` 目录。
+- 六个 shell 脚本均在 `postgres:17.10-alpine3.23` 的 `/bin/sh` 中通过语法检查；临时初始化测试确认 `.env=600`、三项随机密钥长度均为64、占位域名守卫生效。
+- 加入 Linux 脚本检查后，本地自动测试为 10 项全部通过。
+- 结构化证据：`demo-evidence/cloud-deployment/2026-08-22/linux-deployment-scripts-result.json`。
+
+Linux 服务器执行顺序：
+
+```sh
+cd deploy/cloud
+sh ./initialize-env.sh
+# 编辑 .env，填写真实 OS_DOMAIN 和 TIKTOK_READONLY_API_KEY
+sh ./validate-deployment.sh
+sh ./deploy.sh
+sh ./backup.sh
+sh ./verify-latest-backup.sh
+```
