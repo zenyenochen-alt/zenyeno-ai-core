@@ -566,6 +566,24 @@ PRODUCT_COLLECTOR_SHARED_SECRET=64位十六进制随机密钥
 - 恢复只进入独立 `offsite_restore` 卷；目标非空时拒绝恢复，不会覆盖在线 PostgreSQL。
 - 没有自动 `forget`/`prune`，避免未经审批删除远端快照。
 
+### 每日自动调度
+
+生产 Linux 服务器提供 systemd 定时器模板与受控安装器：
+
+```sh
+sudo sh ./systemd/install-backup-timer.sh /opt/ai-ecommerce-os/deploy/cloud ai-ecommerce
+sh ./systemd/backup-timer-status.sh
+```
+
+- 固定每天北京时间 03:15 运行，随机延迟最多 15 分钟，避免多台服务器同时冲击对象存储；
+- `Persistent=true`，服务器关机错过时间后会补跑；
+- 服务以指定部署用户运行，要求该用户具备 Docker 权限；
+- `.env` 未启用、仓库不是 HTTPS 或仍为占位值时拒绝安装；
+- `UMask=0077`、`NoNewPrivileges=true`，输出与失败进入 systemd journal；
+- 状态脚本显示计时器、下次运行时间与最近 100 行备份日志；
+- 安装动作只应在真实服务器和真实 S3 凭证齐备后执行，本机没有伪造 systemd 安装状态。
+
+一次性容器安装验收已验证模板能正确渲染绝对部署路径、服务用户和北京时间，且生成文件不残留占位符。
 ### 验收
 
 在没有公网端口的临时 Docker 网络中启动 PostgreSQL 与 S3 兼容对象存储：
