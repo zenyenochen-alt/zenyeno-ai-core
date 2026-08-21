@@ -260,3 +260,38 @@ Official OpenAI or Anthropic API models can later be added through n8n Credentia
 ### 老板下一步
 
 打开 `http://127.0.0.1:8000/os/setup`，自行创建第一个老板账号和强密码。不要把密码发给 Codex。进入后先创建一名测试员工并只分配一家测试店，再用一条真实 1688 商品做候选和 SKU 绑定演练。
+## 2026-08-21 第二阶段本地生产准备
+
+### 新增能力
+
+- 员工账号支持老板修改角色、启用/停用、重新分配多家店和重置临时密码；老板账号不能通过员工接口修改。
+- TikTok官方只读同步现在验证返回地区必须与当前店铺一致，并保存官方店名和最近验证时间；若身份不一致则整次同步被阻止。
+- 免费公开选品发现接入固定的 DuckDuckGo HTML 公开搜索源，只接受 `shop.tiktok.com` 且路径包含 `/pdp/` 的结果。公开快照只生成 `research_required` 候选，不提供实时销量或成本证明。
+- 免费公开搜索源实时可访问：HTTP 200，本次测试页包含11个搜索结果链接；候选解析与白名单通过自动合同测试。
+- 老板工作台新增“立即备份”；`workbench_backup.py` 使用SQLite在线备份API、SHA-256清单和 `PRAGMA quick_check`，保留最近30份。恢复要求明确确认词，并在恢复前自动创建第二份保护备份。
+- 已为真实 `workbench.db` 创建首个备份并独立验证：哈希匹配、`sqlite_quick_check=ok`。
+- 老板批准商品后只生成 `tiktok_listing_draft` 待执行项。每项包含唯一幂等键、供应链快照哈希、载荷哈希和第二次人工批准要求；当前无执行按钮。
+- 出单后采购请求必须重新提交采购价、库存、发货天数、SKU映射与原始快照哈希。任何变化或库存不足都会阻止请求；一致时只生成 `supplier_purchase` 待执行项，仍不付款。
+
+### 新增入口
+
+- `PUT /os/api/employees/{employee_id}`：修改员工角色、状态与店铺。
+- `POST /os/api/employees/{employee_id}/reset-password`：老板重置员工临时密码。
+- `POST /os/api/admin/backup`：创建并验证数据库备份。
+- `POST /os/api/discovery/public-search`：免费公开发现候选。
+- `POST /os/api/candidates/{candidate_id}/purchase-request`：采购前二次核验并进入待执行队列。
+- `backup-now.cmd`：命令行立即备份。
+- 恢复命令：`python workbench_backup.py restore <备份文件> --confirm RESTORE_WORKBENCH`；恢复前应停止工作台服务。
+
+### 验收
+
+- 三组E2E全部通过：账号与多店权限；候选、1688绑定、评分、审批与待执行队列；官方只读同步、异常与事实草稿；备份、哈希验证、错误恢复确认拦截和显式恢复。
+- 真实运行检查：工作台正常、n8n HTTP 200、Ollama可用、全部新增路由存在、`operation_outbox`表与店铺官方身份字段完成迁移。
+- `mutation_routes_enabled=false`；没有TikTok上架、改价、库存变更、1688下单或付款调用。
+
+### 仍需外部条件
+
+- 公网员工访问仍需要云服务器、公司域名、HTTPS、PostgreSQL和异地备份目标；当前仅绑定 `127.0.0.1`。
+- 1688实时商品与采购API需要合法开放平台应用和凭证；当前二次核验由人工录入事实快照。
+- TikTok写入API需要单独申请写权限、沙箱验证、第二审批、结果回读与对账；当前只创建待执行项。
+- LinkFox/EchoTik/FastMoss真实市场数据仍受积分余额限制。免费公开搜索不能替代实时市场数据库。
