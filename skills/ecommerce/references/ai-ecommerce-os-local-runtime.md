@@ -606,3 +606,48 @@ sh ./systemd/backup-timer-status.sh
 - 在服务器 `.env` 填写真实端点、区域和访问键；
 - 首次初始化后立即关闭 `RESTIC_AUTO_INIT`；
 - 设置每日备份计划，并至少每月执行一次隔离恢复演练。
+
+## 2026-08-22 员工登录与权限安全基线
+
+本节覆盖此前仅有基础登录、但会话无法由服务端撤销的旧状态。员工工作台现已实现以下生产前安全基线：
+
+- 密码使用 PBKDF2-HMAC-SHA256，默认 600,000 轮；旧 310,000 轮哈希在用户成功登录后自动升级，不保存明文密码。
+- 密码最少 12 个字符；用户名、密码输入均有限长，避免异常大请求。
+- Cookie 中只保存带 HMAC 签名的随机会话 ID；会话哈希、用户、到期时间和撤销时间保存在数据库 `auth_sessions`。
+- 默认会话有效期 8 小时；登出、管理员重置员工密码、修改员工权限都会撤销对应服务端会话。
+- 员工重新登录后需重新获取 CSRF 令牌；所有认证后的 POST、PUT、PATCH、DELETE 请求都必须携带 `x-csrf-token`。
+- 设置老板账号和登录接口只接受 JSON；跨站 `Origin`、`Referer` 或 `Sec-Fetch-Site` 请求被拒绝。
+- 登录失败记录保存在 `login_guards`，按隐私化 HMAC 键统计；15 分钟窗口内失败 5 次后临时阻断 15 分钟，并返回 HTTP 429。
+- 不存在的用户名仍执行一次虚拟密码哈希验证，缩小用户名枚举的时间差。
+- 云端Cookie启用 `Secure`、`HttpOnly`、`SameSite=Strict`；页面返回 CSP、`X-Frame-Options: DENY`、`nosniff`、`no-referrer`、COOP/CORP 和禁用摄像头/麦克风/定位的权限策略。
+- `/os` 与认证接口使用 `Cache-Control: no-store`；云端启用一年 HSTS。
+- 由于当前页面仍内嵌脚本和样式，CSP暂时保留 `unsafe-inline`；迁移到独立静态文件或 nonce 后才能进一步收紧，不能将当前CSP描述为最终状态。
+
+安全升级后，旧版无状态Cookie会失效。用户只需在工作台重新登录一次；不需要重新授权TikTok店铺，也不会改动商品或订单。
+
+### 验收结果
+
+- 前端 JavaScript `node --check`：通过。
+- Python编译：通过。
+- 工作台、云部署与Browser采集器回归：19项通过。
+- 本地运行时：`/os/status` HTTP 200，认证安全状态全部启用，平台写入路由仍关闭。
+- 独立Docker/PostgreSQL空卷测试：connector、n8n、workbench和PostgreSQL全部健康。
+- PostgreSQL真实HTTP流程：老板设置、员工创建、两家店、跨店403、选品证据门槛、1688准确SKU绑定、人工审批、采购任务幂等、退出与重新登录全部通过。
+- 数据库包含15张public表，其中认证表为 `auth_sessions` 和 `login_guards`。
+- PostgreSQL custom-format备份通过SHA-256验证，并实际恢复到独立临时数据库；恢复后15张表和2张认证表完整存在。
+- 验收发现并修复 `verify-latest-backup.sh` 未进入 `/backups` 目录就校验相对SHA-256清单的问题。
+- 临时容器、网络和数据卷已删除；原有n8n健康检查仍为HTTP 200。
+- 全程没有执行TikTok Shop写入，也没有执行采购付款。
+
+结构化证据：`demo-evidence/cloud-deployment/2026-08-22/employee-auth-security.json`。
+
+### 运维规则
+
+1. 正式发布后通知员工重新登录，不保留旧Cookie兼容入口。
+2. 不要把会话签名密钥、数据库密码、TikTok密钥或CSRF令牌写入Git、Obsidian或聊天记录。
+3. 管理员修改员工负责店铺或重置密码后，员工必须重新登录，这是预期行为。
+4. 生产故障排查先看 `/os/status` 的非敏感状态，再查服务日志；不要输出Cookie或密码。
+5. 在没有真实域名、DNS、HTTPS和服务器前，不声称公网员工工作台已经上线。
+6. 写入类API继续保持关闭；以后开放商品发布必须经过来源证据、SKU快照、人工批准、幂等键和写后回读。
+
+实现依据：OWASP Password Storage、CSRF Prevention 与 Session Management Cheat Sheet。
