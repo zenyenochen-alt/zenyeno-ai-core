@@ -718,3 +718,19 @@ PostgreSQL真实HTTP验收已通过：精确供应商身份、选品证据门槛
 Worker当前生产版本：c337c6b2-abdb-4629-aef1-142c0653382e；回滚版本：609d08bf-f8ad-42c6-8a39-ac88f3972a59。
 
 本机部署补充：当前localhost:5678已安装并激活TikTokShopScheduledReadonly002，每15分钟运行；隔离CLI实测再次同步PH 53件与TH 60件且状态success。项目根目录start-local-os.cmd负责在重启后启动n8n、只读connector和员工工作台，并进行健康检查；启动脚本不得打印或提交密钥。
+
+## Employee selection readiness UI (2026-09-02)
+
+When extending the employee workbench, keep the supplier workflow visible and structured; employees must not enter raw JSON or operate n8n, Docker, API keys, databases, or platform credentials.
+
+1. Return supplier bindings and SKU mappings only for shops authorized to the signed-in user.
+2. Render per-candidate readiness for traceable evidence, selection score, exact 1688 Offer identity, current price/stock/lead-time snapshot, SKU mappings, content draft, human review, and queued listing draft.
+3. Collect supplier identity, Offer ID, canonical HTTPS link, price, currency, stock, lead time, and each SKU mapping in labeled form fields.
+4. Accept employee-friendly attributes such as `颜色=红色;尺码=L`, then convert them into structured attributes before calling the API.
+5. Keep all existing server-side validation authoritative; UI checks are explanatory and must never replace backend gates.
+6. Show submit-to-review only after evidence, score, supplier snapshot, and SKU mapping gates pass.
+7. Describe outbox records in employee language while keeping marketplace writes, supplier ordering, and payment disabled until a separate substantive approval and write-after-read design exists.
+
+Verification baseline: run the full Python regression suite, validate the embedded JavaScript with Node, restart local services, verify `/os/status`, connector health, and n8n health, then record a privacy-safe evidence artifact.
+
+Current verified baseline: 28 Python tests passed, JavaScript syntax passed, workbench/connector/n8n healthy, and zero marketplace writes, supplier orders, or payments executed.
