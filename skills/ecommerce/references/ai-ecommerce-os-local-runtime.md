@@ -713,7 +713,7 @@ PostgreSQL真实HTTP验收已通过：精确供应商身份、选品证据门槛
 6. SQLite事务上下文必须提交或回滚后关闭连接，并启用WAL与busy timeout；否则批量详情写入可能出现database is locked。
 7. 此链路仅同步店内官方商品，不等同FastMoss/EchoTik市场销量数据，也不授权任何平台写入。
 
-2026-09-02验收基线：PH-01 53件中50件有HTTPS主图、3件no_images；TH-01 60件中59件有主图、1件no_images。Python回归27项、Worker测试13项通过。平台上架、改价、库存、订单、1688下单和付款均为0。
+2026-09-02验收基线：PH-01 53件中50件有HTTPS主图、3件no_images；TH-01 60件中59件有主图、1件no_images。Python回归28项、Worker测试13项通过。平台上架、改价、库存、订单、1688下单和付款均为0。
 
 Worker当前生产版本：c337c6b2-abdb-4629-aef1-142c0653382e；回滚版本：609d08bf-f8ad-42c6-8a39-ac88f3972a59。
 
