@@ -734,3 +734,27 @@ When extending the employee workbench, keep the supplier workflow visible and st
 Verification baseline: run the full Python regression suite, validate the embedded JavaScript with Node, restart local services, verify `/os/status`, connector health, and n8n health, then record a privacy-safe evidence artifact.
 
 Current verified baseline: 28 Python tests passed, JavaScript syntax passed, workbench/connector/n8n healthy, and zero marketplace writes, supplier orders, or payments executed.
+
+## LinkFox market-source smoke test (2026-09-02)
+
+Current verified state supersedes the 2026-08-15 placeholder note:
+
+- `LINKFOXAGENT_API_KEY` is configured in the real Windows user environment; never log, commit, or copy its value into Skill files.
+- EchoTik `listNewProductRank` for TH on 2026-09-02 and 2026-09-01 returned HTTP 200 with an XML business error 10000: no matching product information.
+- The installed EchoTik Python client assumes JSON for every HTTP 200 response and raises `JSONDecodeError` on that XML error. A privacy-safe BUG report was submitted to LinkFox.
+- FastMoss `productRankTopSelling` for TH, day 2026-09-01, page 1, units-sold descending authenticated successfully and returned JSON `errcode=200`, `total=0`.
+- Treat a successful zero-result window as `research_required`, not as zero market demand and not as permission to fabricate candidates.
+- After an empty or failed paid lookup, do not automatically change date, time granularity, keyword, page, or region. Explain the possible additional point cost before one bounded follow-up query.
+- The next cheapest validation is one FastMoss TH monthly query for 2026-08; only run it after the user accepts the extra query cost.
+- Marketplace writes, supplier orders, and payments remain disabled.
+
+## First real FastMoss-to-1688 selection chain (2026-09-02)
+
+- FastMoss TH month 2026-08 returned 500 ranked records; page 1 contained 10 products. The first controlled candidate was the page-rank-2 marble-pattern PVC wall sticker with observed 30-day sales 203,640 and 30-day GMV THB 1,219,803.60.
+- The strict 1688 query with cross-border and dropship constraints returned zero. After explicit user approval, one broader `大理石纹自粘墙贴` query returned 10 offer-level candidates.
+- Preferred offer candidate: `832030886124`, MOQ 1, observed price and dropship price CNY 0.55, 48-hour delivery, 68,985 observed 30-day units; its title confirms 30x30 but not the market listing''s 30x60 variant.
+- Keep the candidate at `blocked_exact_sku_required` until each marketplace variant has an exact 1688 SKU ID, attributes, material/thickness, current stock, weight, pack quantity, current price, and observation timestamp.
+- Strict score was 35/100: demand 30, supplier discoverability 5, all unverified commercial, competitive, compliance, and operational dimensions 0. Decision remains `research_required`.
+- Both installed LinkFox scripts required `encoding="utf-8"` on output `open()` calls to handle Thai text and the yuan symbol on Windows. Cached replays then succeeded without repeat API calls; privacy-safe BUG feedback was submitted.
+- Never commit API keys or raw Authorization headers. Raw market files stay in the project evidence area; the Skill stores only process rules and privacy-safe aggregates.
+- Marketplace writes, supplier ordering, and payment remain disabled.
