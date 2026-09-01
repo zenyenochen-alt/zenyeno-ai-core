@@ -716,3 +716,5 @@ PostgreSQL真实HTTP验收已通过：精确供应商身份、选品证据门槛
 2026-09-02验收基线：PH-01 53件中50件有HTTPS主图、3件no_images；TH-01 60件中59件有主图、1件no_images。Python回归27项、Worker测试13项通过。平台上架、改价、库存、订单、1688下单和付款均为0。
 
 Worker当前生产版本：c337c6b2-abdb-4629-aef1-142c0653382e；回滚版本：609d08bf-f8ad-42c6-8a39-ac88f3972a59。
+
+本机部署补充：当前localhost:5678已安装并激活TikTokShopScheduledReadonly002，每15分钟运行；隔离CLI实测再次同步PH 53件与TH 60件且状态success。项目根目录start-local-os.cmd负责在重启后启动n8n、只读connector和员工工作台，并进行健康检查；启动脚本不得打印或提交密钥。
