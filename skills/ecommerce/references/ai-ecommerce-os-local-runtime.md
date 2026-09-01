@@ -700,3 +700,19 @@ PostgreSQL真实HTTP验收已通过：精确供应商身份、选品证据门槛
 - 真实1688开放API或付费数据服务尚未接入。当前能严格保存和复核人工或合规采集得到的供应链快照，但不能声称已经自动读取1688实时库存和SKU。
 - 正式公网员工工作台、真实域名、DNS、HTTPS和云服务器仍未部署。
 - TikTok自动上架、1688自动下单和自动付款继续关闭。
+
+## 2026-09-02 定时只读同步与商品主图规则
+
+实现准则：
+
+1. n8n定时同步必须逐店处理，固定校验完整分页、店铺市场、mode=read_only 与 mutation_routes_enabled=false；任何一项不符即失败。
+2. 商品列表接口通常不包含完整主图。需要经内部connector调用官方 Get Product 详情，只允许TH/PH和数字product_id。
+3. 主图只保存HTTPS地址；列表重新同步必须保留已有main_images和_detail_cache。
+4. 官方无图或调用失败时记录no_images/failed，保留未知，不生成假图；6小时内退避，避免重复消耗API配额。
+5. 员工界面只展示商品、官方主图、异常、草稿和任务；不得暴露Worker密钥、n8n、数据库或Docker。
+6. SQLite事务上下文必须提交或回滚后关闭连接，并启用WAL与busy timeout；否则批量详情写入可能出现database is locked。
+7. 此链路仅同步店内官方商品，不等同FastMoss/EchoTik市场销量数据，也不授权任何平台写入。
+
+2026-09-02验收基线：PH-01 53件中50件有HTTPS主图、3件no_images；TH-01 60件中59件有主图、1件no_images。Python回归27项、Worker测试13项通过。平台上架、改价、库存、订单、1688下单和付款均为0。
+
+Worker当前生产版本：c337c6b2-abdb-4629-aef1-142c0653382e；回滚版本：609d08bf-f8ad-42c6-8a39-ac88f3972a59。
